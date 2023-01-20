@@ -6,64 +6,53 @@ plugin2cube
 Abstract
 --------
 
-Small utility app that “registers” a ChRIS plugin to a CUBE instance
-from the CLI. As of January 2023, CUBE no longer needs a companion store
-for plugin registration. It is now possible to register a plugin
-directly to CUBE itself using updates to the CUBE API. This utility
-script leverages this API to allow for direct registration of plugins.
+A small utility application that can register a list of ChRIS pipeline
+files and all dependent plugins to a CUBE instance.
 
 Overview
 --------
 
-``plugin2cube`` is a simple app that allows for the registration of a
-plugin image directly to a CUBE instance without the need of a ChRIS
-Store as intermediary. This allows for simpler, more portable management
-of plugins in a given CUBE.
+This app is a straightforward CLI tool that can be used to register a
+pipeline directly to a CUBE instance by using the the ``chrs`` and
+``pipeline2cube`` apps.
 
-The script does need to determine the plugin JSON representation. There
-are two broad mechanisms for resolving this. The first is to simply read
-this representation from a file. The second is to actually *run* the
-plugin image to determine the representation.
+A given pipeline (in a list) is passed to ``chrs`` to add to a CUBE. Any
+plugins in the pipeline that are not currently registered to CUBE will
+be returned as errors by ``chrs``.
 
-Running the image does require ``docker`` to be present on the host
-executing this script. Two assumptions are made in this case:
+The ``pipeline2cube`` app will then simply parse that error information
+and attempt to register the missing plugin, afterwhich it will
+re-attempt the ``chrs`` operation.
 
--  The plugin has been created using the ``chris_plugin_template`` in
-   which case the ``chris_plugin_info`` mechanism is used to determine
-   the JSON representation. This is attempted, and if successful, the
-   representation is used.
--  Failing that, the plugin is assumed to be created using the
-   cookiecutter mechanism (or similar) and that the plugin code supports
-   the ``--json`` flag to describe its representation. In this case, the
-   script, if not explicitly told what the actual plugin executable
-   within the image (from –pluginexec) is, will assume that the
-   executable can be found from the docker image name
-   ``<prefix>/<prefix>/.../pl-<pluginexec>``
+In some ways, this app is akin to a Linux package installer that
+installs a “meta” package (a pipeline) and fetches/installs all its
+dependencies (plugins) if they don’t exist (are not yet registered to a
+CUBE).
+
+Dependencies
+------------
+
+The dependencies of ``plugin2cube`` are most pertinent, i.e. ``docker``
+on the host for complete plugin registration. For its part
+``pipeline2cube`` relies on ``chrs`` for its internal heavy lifting.
 
 Arguments
 ---------
 
 .. code:: html
 
-           --dock_image <container_name>
-           The name of the plugin container image. This is typically something like
+           --pipelines <comma,list,of,pipelinefiles>
+           A comma separated list of pipeline files to register. These are in either
+           JSON or YML format suitable for processing the ChRIS command line client
+           tool `chrs` (see https://crates.io/crates/chrs).
 
-                                   fnndsc/pl-someAnalysis
-           or
-                               localhost/fnndsc/pl-someAnalysis
+           Each pipeline file in turn is dispatched to `chrs` for processing, and
+           any outputs from `chrs` are processed to either continue, register
+           missing plugins, or abort.
 
-           --name <pluginNameInCUBE>
-           The name of the plugin within CUBE. Typically something like
-           "pl-someAnalysis".
-
-           --public_repo <repo_name>
-           The URL of the plugin code, typically on github. This is accessed to
-           find a README.[rst|md] which is used by the ChRIS UI when providing
-           plugin details.
-
-           [--pluginexec <exec>]
-           The name of the actual plugin executable within the image if this
-           executable does not conform to standard conventions.
+           [--registry <defaultContainerRegistry>] ("fnndsc")
+           The default registry organization -- assumed to be valid for all
+           plugins in a given pipeline.
 
            [--computenames <commalist,of,envs>] ("host")
            A comma separted list of compute environments within a CUBE to which
@@ -77,10 +66,6 @@ Arguments
 
            [--CUBEpasswd <password>] ("chris1234")
            The admin password.
-
-           [--json <jsonRepFile>]
-           If provided, read the representation from <jsonRepFile> and do not
-           attempt to run the plugin with docker.
 
            [--inputdir <inputdir>]
            An optional input directory specifier.
@@ -118,30 +103,31 @@ Easiest vector for installation is
 
 .. code:: bash
 
-   pip install plugin2cube
+   pip install pipeline2cube
 
 Examples
 --------
 
-``plugin2cube`` accepts several CLI flags/arguments that together
-specify the CUBE instance, the plugin JSON description, as well as
-additional parameters needed for registration. For a full list of
-supported arguments, do
+``pipeline2cube`` accepts several CLI flags/arguments that together
+specify the CUBE instance, pipelines to process, and several optional
+parameters. For a full list of supported arguments, do
 
 .. code:: shell
 
-   plugin2cube --man
+   pipeline2cube --man
 
 To register a plugin, do
 
 .. code:: shell
 
-   # Simplest way -- json representation is determined by running the container
-   # This requires of course that the machine running this script has docker installed!
-   plugin2cube --CUBEurl http://localhost:8000/api/v1/ --CUBEuser chris --CUBEpassword chris1234 \
-               --dock_image local/pl-imageProc                         \
-               --name pl-imageProc                                     \
-               --public_repo https://github.com/FNNDSC/pl-imageProc
+   pipeline2cube                                                           \
+       --CUBEurl http:localhost:8000/api/v1/                               \
+       --CUBEuser chrisadmin                                               \
+       --CUBEpasswd something1234                                          \
+       --computenames host,galena                                          \
+       --registry fnndsc
+       --pipeline pipeline1.yml,pipeline2.yml                              \
+       --verbosity 1
 
 Development
 -----------
