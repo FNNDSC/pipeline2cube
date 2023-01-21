@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-__version__ = '1.0.2'
+__version__ = '1.0.4'
 
 from    pathlib                 import Path
 
@@ -236,7 +236,7 @@ class pipeline2cube:
                         container_name()
                 )
                 # Declare but set to empty string
-                for opt in ['jsonFile', 'pluginexec', 'name', 'public_repo']:
+                for opt in ['jsonFile', 'pluginexec', 'name', 'public_repo', 'nodockerpull']:
                     setattr(self.options, opt, "")
                 return self.options
 
@@ -247,6 +247,7 @@ class pipeline2cube:
                                     options = plugin2cube_optionsPrep(),
                                     env     = self.env
                     ).run()
+                    # pudb.set_trace()
                     d_pipeline_add['status']    = d_pipeline_add['register']['status']
                     b_missingPluginRegisteredOK = False
                 else:
@@ -255,19 +256,24 @@ class pipeline2cube:
 
             b_status                : bool  = True
             b_pluginsAllRegistered  : bool  = False
-            d_pipeline_add          : dict  = {}
+            d_pipeline_add          : dict  = {
+                'pipeline'  : "",
+                'status'    : True
+            }
 
             for file_pipeline in self.options.l_pipeline:
+                file_pipeline = os.path.expanduser(file_pipeline)
                 self.env.INFO("", level = 1)
                 self.env.INFO("<magenta>%s</magenta>" % file_pipeline, level = 1)
                 d_pipeline_add['pipeline']  = file_pipeline
                 b_pluginsAllRegistered  = False
-                while not b_pluginsAllRegistered:
+                while not b_pluginsAllRegistered and d_pipeline_add['status']:
                     d_pipeline_add          = chrs_pipeline_add(file_pipeline)
                     b_pluginsAllRegistered  = plugin_registerAnyMissing(d_pipeline_add)
                 ld_pipeline_add.append(d_pipeline_add)
-                b_status    &= d_pipeline_add['status']
                 success_report(d_pipeline_add['status'], d_pipeline_add)
+                b_status    &= d_pipeline_add['status']
+                if not b_status: break
             return ld_pipeline_add, b_status
 
         str_threadName  : str   = current_thread().getName()
